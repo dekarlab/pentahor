@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<plugin
+   id="PRScript"
+   iconfile="rlogosmall.png"
+   description="Execute R Script"
+   tooltip="Execute R script from file by specifying input and output variables."
+   category="Input"
+   classname="de.dekarlab.pentahor.plugin.PRCalcMeta">
+   <libraries>
+    <library name="r-script-plugin.jar"/>
+    <library name="JRI.jar"/>
+    </libraries>
+   <localized_category>
+     <category locale="en_US">Scripting</category>
+   </localized_category>
+   <localized_description>
+     <description locale="en_US">Execute R Script</description>
+   </localized_description>
+   <localized_tooltip>
+     <tooltip locale="en_US">Execute R Script</tooltip>
+    </localized_tooltip>
+</plugin>
