@@ -121,23 +121,25 @@ public class RRunner {
 	 */
 	public synchronized void run() throws Exception {
 		if (running) {
-			// throw new
-			// Exception("It is possible to have only one R session!");
+			throw new Exception("It is possible to have only one R session!");
 		}
-		running = true;
-		if (callback instanceof RCallback) {
-			((RCallback) callback).clearOutput();
+		try {
+			running = true;
+			if (callback instanceof RCallback) {
+				((RCallback) callback).clearOutput();
+			}
+			initVariables();
+			evaluateFileByString(filePath);
+
+			ret = re.eval("OUTPUT");
+			if (ret == null) {
+				throw new Exception(
+						"The R Script file should contain initialization of OUTPUT list to transfer values to PDI, for example, OUTPUT<-list(\"c\"=c)");
+			}
+			getVariables();
+		} finally {
+			running = false;
 		}
-		initVariables();
-		evaluateFileByString(filePath);
-		
-		ret = re.eval("OUTPUT");
-		if (ret == null) {
-			throw new Exception(
-					"The R Script file should contain initialization of OUTPUT list to transfer values to PDI, for example, OUTPUT<-list(\"c\"=c)");
-		}
-		getVariables();
-		running = false;
 	}
 
 	/**
@@ -173,20 +175,64 @@ public class RRunner {
 		// default:
 		// }
 		// }
+
 		for (PRVariable var : inputVars) {
-			switch (var.getType()) {
-			case PRVariable.TYPE_BOOLEAN:
-				re.eval(var.getrName() + "<-"
-						+ ((Boolean) var.getValue() ? "TRUE" : "FALSE"));
-				break;
-			case PRVariable.TYPE_NUMBER:
-				re.eval(var.getrName() + "<-" + (Double) var.getValue());
-				break;
-			case PRVariable.TYPE_STRING:
-				re.eval(var.getrName() + "<-" + "\"" + var.getValue() + "\"");
-				break;
-			default:
+			if (var instanceof PRColumnVariable) {
+				initColumnVariable((PRColumnVariable) var);
+			} else {
+				initVariable(var);
 			}
+		}
+	}
+
+	protected void initVariable(PRVariable var) {
+		switch (var.getType()) {
+		case PRVariable.TYPE_BOOLEAN:
+			re.eval(var.getrName() + "<-"
+					+ ((Boolean) var.getValue() ? "TRUE" : "FALSE"));
+			break;
+		case PRVariable.TYPE_NUMBER:
+			re.eval(var.getrName() + "<-" + (Double) var.getValue());
+			break;
+		case PRVariable.TYPE_STRING:
+			re.eval(var.getrName() + "<-" + "\"" + var.getValue() + "\"");
+			break;
+		default:
+		}
+	}
+
+	/**
+	 * Initialize column variables.
+	 * 
+	 * @param var
+	 */
+	protected void initColumnVariable(PRColumnVariable var) {
+		switch (var.getType()) {
+		case PRVariable.TYPE_BOOLEAN:
+			Boolean[] valueFrom = var.getValueColumn().toArray(
+					new Boolean[var.getValueColumn().size()]);
+			boolean[] value = new boolean[valueFrom.length];
+			for (int i = 0; i < value.length; i++) {
+				value[i] = valueFrom[i];
+			}
+			re.assign(var.getrName(), value);
+			break;
+		case PRVariable.TYPE_NUMBER:
+			Double[] valueFromD = var.getValueColumn().toArray(
+					new Double[var.getValueColumn().size()]);
+			double[] valueD = new double[valueFromD.length];
+			for (int i = 0; i < valueD.length; i++) {
+				valueD[i] = valueFromD[i];
+			}
+			re.assign(var.getrName(), valueD);
+			break;
+		case PRVariable.TYPE_STRING:
+			re.assign(
+					var.getrName(),
+					var.getValueColumn().toArray(
+							new String[var.getValueColumn().size()]));
+			break;
+		default:
 		}
 
 	}

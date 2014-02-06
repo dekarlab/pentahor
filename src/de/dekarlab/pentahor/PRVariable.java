@@ -28,7 +28,7 @@ public class PRVariable {
 	private String pentahoName;
 	private Object value;
 	private int type;
-
+	
 	/**
 	 * Variable.
 	 * 
@@ -99,5 +99,5 @@ public class PRVariable {
 	public int getType() {
 		return type;
 	}
-
+	
 }

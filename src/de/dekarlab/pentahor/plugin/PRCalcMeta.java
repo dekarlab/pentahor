@@ -61,6 +61,7 @@ public class PRCalcMeta extends BaseStepMeta implements StepMetaInterface {
 	private String scriptFilePath;
 	private List<PRVariable> inputVars;
 	private List<PRVariable> outputVars;
+	private boolean inputTable;
 
 	/**
 	 * Constructor.
@@ -100,6 +101,11 @@ public class PRCalcMeta extends BaseStepMeta implements StepMetaInterface {
 			throws KettleXMLException {
 		try {
 			scriptFilePath = XMLHandler.getTagValue(stepnode, "scriptfilepath");
+			inputTable = false;
+			String value = XMLHandler.getTagValue(stepnode, "inputTable");
+			if (value != null && value.equals("true")) {
+				inputTable = true;
+			}
 			this.inputVars = new ArrayList<PRVariable>();
 			this.outputVars = new ArrayList<PRVariable>();
 
@@ -141,6 +147,9 @@ public class PRCalcMeta extends BaseStepMeta implements StepMetaInterface {
 		StringBuffer retval = new StringBuffer();
 		retval.append("    ").append(
 				XMLHandler.addTagValue("scriptfilepath", scriptFilePath));
+		retval.append("    ").append(
+				XMLHandler.addTagValue("inputTable", (inputTable ? "true"
+						: "false")));
 		retval.append("    <inputvars>").append(Const.CR);
 		for (PRVariable field : inputVars) {
 			retval.append("      <inputvar>").append(Const.CR);
@@ -187,6 +196,13 @@ public class PRCalcMeta extends BaseStepMeta implements StepMetaInterface {
 		try {
 			this.scriptFilePath = rep.getStepAttributeString(idStep,
 					"scriptfilepath");
+
+			inputTable = false;
+			String value = rep.getStepAttributeString(idStep, "inputTable");
+			if (value != null && value.equals("true")) {
+				inputTable = true;
+			}
+
 			int nrInFields = rep
 					.countNrStepAttributes(idStep, "inputvar_rname");
 			for (int i = 0; i < nrInFields; i++) {
@@ -230,6 +246,9 @@ public class PRCalcMeta extends BaseStepMeta implements StepMetaInterface {
 		try {
 			rep.saveStepAttribute(idTransformation, idStep, "scriptfilepath",
 					scriptFilePath);
+			rep.saveStepAttribute(idTransformation, idStep, "inputTable",
+					(inputTable ? "true" : "false"));
+
 			for (int i = 0; i < inputVars.size(); i++) {
 				rep.saveStepAttribute(idTransformation, idStep, i,
 						"inputvar_rname", inputVars.get(i).getrName());
@@ -414,6 +433,14 @@ public class PRCalcMeta extends BaseStepMeta implements StepMetaInterface {
 	 */
 	public void setOutputVars(List<PRVariable> outputVars) {
 		this.outputVars = outputVars;
+	}
+
+	public boolean isInputTable() {
+		return inputTable;
+	}
+
+	public void setInputTable(boolean inputTable) {
+		this.inputTable = inputTable;
 	}
 
 }

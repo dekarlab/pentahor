@@ -23,6 +23,8 @@ import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.trans.step.StepDataInterface;
 import org.pentaho.di.trans.step.BaseStepData;
 
+import de.dekarlab.pentahor.PRVariable;
+
 public class PRCalcData extends BaseStepData implements StepDataInterface {
 
 	/**
@@ -33,6 +35,9 @@ public class PRCalcData extends BaseStepData implements StepDataInterface {
 	 * Initial count of columns.
 	 */
 	private int inputSize;
+
+	private PRVariable[] inputVars;
+	private PRVariable[] outputVars;
 
 	public PRCalcData() {
 		super();
@@ -52,6 +57,22 @@ public class PRCalcData extends BaseStepData implements StepDataInterface {
 
 	public void setInputSize(int inputSize) {
 		this.inputSize = inputSize;
+	}
+
+	public PRVariable[] getInputVars() {
+		return inputVars;
+	}
+
+	public void setInputVars(PRVariable[] inputVars) {
+		this.inputVars = inputVars;
+	}
+
+	public PRVariable[] getOutputVars() {
+		return outputVars;
+	}
+
+	public void setOutputVars(PRVariable[] outputVars) {
+		this.outputVars = outputVars;
 	}
 
 }

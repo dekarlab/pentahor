@@ -25,6 +25,7 @@ import java.util.Arrays;
 
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.row.RowDataUtil;
+import org.pentaho.di.core.row.RowMeta;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.row.ValueMeta;
 import org.pentaho.di.core.row.ValueMetaInterface;
@@ -36,6 +37,7 @@ import org.pentaho.di.trans.step.StepInterface;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInterface;
 
+import de.dekarlab.pentahor.PRColumnVariable;
 import de.dekarlab.pentahor.PRPrintStream;
 import de.dekarlab.pentahor.PRVariable;
 import de.dekarlab.pentahor.RRunner;
@@ -64,112 +66,187 @@ public class PRCalc extends BaseStep implements StepInterface {
 	}
 
 	/**
+	 * Run R and put result to output.
+	 * 
+	 * @param smi
+	 * @param sdi
+	 * @return
+	 * @throws KettleException
+	 */
+	protected void runR(PRVariable[] inputVars, PRVariable[] outputVars)
+			throws Exception {
+		// Create R code runner.
+		RRunner rr = RRunner.getInstance(
+				environmentSubstitute(meta.getScriptFilePath()), inputVars,
+				outputVars);
+		// Evaluate
+		logBasic("Run R Script from " + meta.getScriptFilePath());
+		rr.run();
+		// Close
+		rr.closeREngine();
+		logBasic("R output: " + rr.getOutput());
+		logBasic("R Script is evaluated. REngine is closed");
+	}
+
+	/**
+	 * Initialize input and output variables for every row.
+	 * 
+	 * @param rowInput
+	 * @param inputVars
+	 * @param outputVars
+	 */
+	private void initInputOutputVars(Object[] rowInput, PRVariable[] inputVars,
+			PRVariable[] outputVars) {
+		// Create input variables with values.
+		PRVariable varTemp;
+		logDebug("Init Input Vars");
+		for (int i = 0; i < meta.getInputVars().size(); i++) {
+			varTemp = meta.getInputVars().get(i);
+			if (meta.isInputTable()) {// Save all values in columns
+				if (inputVars[i] == null) {// first row
+					inputVars[i] = new PRColumnVariable(varTemp.getrName(),
+							varTemp.getPentahoName(), varTemp.getType());
+				}
+			} else {
+				inputVars[i] = new PRVariable(varTemp.getrName(),
+						varTemp.getPentahoName(), varTemp.getType());
+			}
+			String[] fNames = getInputRowMeta().getFieldNames();
+			for (int j = 0; j < fNames.length; j++) {
+				if (fNames[j].equals(varTemp.getPentahoName())) {
+					logDebug("Name: " + varTemp.getPentahoName() + " Class: "
+							+ rowInput[j].getClass().getCanonicalName());
+					inputVars[i].setValue(rowInput[j]);
+					logDebug("Input: " + inputVars[i].getrName() + "="
+							+ inputVars[i].getValue());
+					break;
+				}
+			}
+		}
+		logDebug("Init Output Vars");
+		// Create output variables.
+		for (int i = 0; i < meta.getOutputVars().size(); i++) {
+			varTemp = meta.getOutputVars().get(i);
+			outputVars[i] = new PRVariable(varTemp.getrName(),
+					varTemp.getPentahoName(), varTemp.getType());
+		}
+	}
+
+	/**
+	 * Initialize row meta.
+	 * 
+	 * @param smi
+	 * @param sdi
+	 * @param rowInput
+	 * @return
+	 */
+	private void initOutputRowMeta() {
+		System.setOut(new PRPrintStream(new ByteArrayOutputStream(), log));
+		System.setErr(new PRPrintStream(new ByteArrayOutputStream(), log));
+		RowMetaInterface outputRowMeta = null;
+		if (meta.isInputTable()) {
+			// output is only result
+			outputRowMeta = new RowMeta();
+		} else {
+			// Add output variables as columns to result.
+			outputRowMeta = getInputRowMeta().clone();
+		}
+		data.setInputSize(getInputRowMeta().size());
+		ValueMetaInterface valueMeta;
+		for (int i = 0; i < meta.getOutputVars().size(); i++) {
+			valueMeta = new ValueMeta();
+			valueMeta.setName(meta.getOutputVars().get(i).getPentahoName());
+			valueMeta.setType(convertRTypeToPentahoType(meta.getOutputVars()
+					.get(i).getType()));
+			outputRowMeta.addValueMeta(valueMeta);
+		}
+		data.setOutputRowMeta(outputRowMeta);
+	}
+
+	/**
+	 * Load JRI library.
+	 * 
+	 * @throws KettleException
+	 */
+	protected void loadJRILibrary() throws Exception {
+		logBasic("Loading JRI library from: "
+				+ new File(System.getProperty("java.library.path"))
+						.getCanonicalPath());
+		System.setProperty("jri.ignore.ule", "yes");
+		logBasic("R is installed in R_HOME: " + System.getenv("R_HOME"));
+		// System.load("/home/dk/R/x86_64-pc-linux-gnu-library/2.15/rJava/jri/libjri.so");
+		System.loadLibrary("jri");
+		logBasic("JRI library is found!");
+	}
+
+	/**
 	 * Process row.
 	 */
 	public final boolean processRow(final StepMetaInterface smi,
 			final StepDataInterface sdi) throws KettleException {
-		// this also waits for a previous step to be
-		// finished.
+		// Get Input row
 		Object[] rowInput = getRow();
-		if (rowInput == null) { // no more input to be expected...
-			this.logDebug("No More Rows.");
-			setOutputDone();
-			return false;
-		}
-
+		meta = (PRCalcMeta) smi;
+		data = (PRCalcData) sdi;
 		try {
-			logBasic("Loading JRI library from: "
-					+ new File(System.getProperty("java.library.path"))
-							.getCanonicalPath());
-			System.setProperty("jri.ignore.ule", "yes");
-			logBasic("R is installed in R_HOME: " + System.getenv("R_HOME"));
-			// System.load("/home/dk/R/x86_64-pc-linux-gnu-library/2.15/rJava/jri/libjri.so");
-			System.loadLibrary("jri");
-			logBasic("JRI library is found!");
-
-			meta = (PRCalcMeta) smi;
-			data = (PRCalcData) sdi;
-
+			// load JRI library
+			loadJRILibrary();
+			// Initialize output row meta
 			if (first) {
 				first = false;
-				System.setOut(new PRPrintStream(new ByteArrayOutputStream(),
-						log));
-				System.setErr(new PRPrintStream(new ByteArrayOutputStream(),
-						log));
-				// Add output variables as columns to result.
-				RowMetaInterface outputRowMeta = getInputRowMeta().clone();
-				data.setInputSize(outputRowMeta.size());
-				ValueMetaInterface valueMeta;
-				for (int i = 0; i < meta.getOutputVars().size(); i++) {
-					valueMeta = new ValueMeta();
-					valueMeta.setName(meta.getOutputVars().get(i)
-							.getPentahoName());
-					valueMeta.setType(convertRTypeToPentahoType(meta
-							.getOutputVars().get(i).getType()));
-					outputRowMeta.addValueMeta(valueMeta);
-				}
-				data.setOutputRowMeta(outputRowMeta);
+				initOutputRowMeta();
+				// Initialize lists of input and output variables with values.
+				data.setInputVars(new PRVariable[meta.getInputVars().size()]);
+				data.setOutputVars(new PRVariable[meta.getOutputVars().size()]);
 			}
-
-			Object[] rowOutput = RowDataUtil.resizeArray(rowInput, data
-					.getOutputRowMeta().size());
-
-			PRVariable[] inputVars = new PRVariable[meta.getInputVars().size()];
-			PRVariable[] outputVars = new PRVariable[meta.getOutputVars()
-					.size()];
-
-			// Create input variables with values.
-			PRVariable varTemp;
-			logDebug("Init Input Vars");
-			for (int i = 0; i < meta.getInputVars().size(); i++) {
-				varTemp = meta.getInputVars().get(i);
-				inputVars[i] = new PRVariable(varTemp.getrName(),
-						varTemp.getPentahoName(), varTemp.getType());
-				String[] fNames = getInputRowMeta().getFieldNames();
-				for (int j = 0; j < fNames.length; j++) {
-					if (fNames[j].equals(varTemp.getPentahoName())) {
-						logDebug("Name: " + varTemp.getPentahoName()
-								+ " Class: "
-								+ rowOutput[j].getClass().getCanonicalName());
-						inputVars[i].setValue(rowOutput[j]);
-						logDebug("Input: " + inputVars[i].getrName() + "="
-								+ inputVars[i].getValue());
-						break;
+			PRVariable[] inputVars = data.getInputVars();
+			PRVariable[] outputVars = data.getOutputVars();
+			if (rowInput == null) { // no more input to be expected...
+				// this.logDebug("Input Table: " + meta.isInputTable());
+				// this.logDebug("Var: " + inputVars[0]);
+				if (meta.isInputTable() && inputVars[0] != null) {
+					this.logDebug("Run R for Table.");
+					// Run R for whole table
+					runR(inputVars, outputVars);
+					Object[] rowOutput = new Object[outputVars.length];
+					// Add calculated outputs to output
+					for (int i = 0; i < outputVars.length; i++) {
+						rowOutput[i] = outputVars[i].getValue();
+						logDebug("Result: " + outputVars[i].getrName() + "="
+								+ outputVars[i].getValue());
 					}
+					putRow(data.getOutputRowMeta(), rowOutput);
 				}
+				this.logDebug("No More Rows.");
+				setOutputDone();
+				return false;
 			}
-			logDebug("Init Output Vars");
-			// Create output variables.
-			for (int i = 0; i < meta.getOutputVars().size(); i++) {
-				varTemp = meta.getOutputVars().get(i);
-				outputVars[i] = new PRVariable(varTemp.getrName(),
-						varTemp.getPentahoName(), varTemp.getType());
+			if (meta.isInputTable()) {
+				// Save new values in variables
+				initInputOutputVars(rowInput, inputVars, outputVars);
+				return true;
+			} else {
+				// Return also values from input
+				Object[] rowOutput = RowDataUtil.resizeArray(rowInput, data
+						.getOutputRowMeta().size());
+				// Initialize variables
+				initInputOutputVars(rowInput, inputVars, outputVars);
+				// Run R for every row.
+				runR(inputVars, outputVars);
+				// Add calculated outputs to output
+				for (int i = 0; i < outputVars.length; i++) {
+					rowOutput[data.getInputSize() + i] = outputVars[i]
+							.getValue();
+					logDebug("Result: " + outputVars[i].getrName() + "="
+							+ outputVars[i].getValue());
+				}
+				putRow(data.getOutputRowMeta(), rowOutput);
+				return true;
 			}
-			// Create R code runner.
-			RRunner rr = RRunner.getInstance(
-					environmentSubstitute(meta.getScriptFilePath()), inputVars,
-					outputVars);
-			// Evaluate
-			logBasic("Run R Script from " + meta.getScriptFilePath());
-			rr.run();
-			// Close
-			rr.closeREngine();
-			logBasic("R output: " + rr.getOutput());
-			logBasic("R Script is evaluated. REngine is closed");
-			// Add calculated outputs to output
-			for (int i = 0; i < outputVars.length; i++) {
-				rowOutput[data.getInputSize() + i] = outputVars[i].getValue();
-				logDebug("Result: " + outputVars[i].getrName() + "="
-						+ outputVars[i].getValue());
-			}
-			putRow(data.getOutputRowMeta(), rowOutput);
-		} catch (Error e) {
-			throw new KettleException("Error by executing R script: ", e);
 		} catch (Exception e) {
 			throw new KettleException("Error by executing R script: "
 					+ Arrays.toString(rowInput), e);
 		}
-		return true;
 	}
 
 	/**

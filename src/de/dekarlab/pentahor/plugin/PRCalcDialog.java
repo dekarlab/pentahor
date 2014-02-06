@@ -78,6 +78,11 @@ public class PRCalcDialog extends BaseStepDialog implements StepDialogInterface 
 	 * Path to script file.
 	 */
 	private TextVar wScriptFilePath;
+
+	/**
+	 * Input Table.
+	 */
+	private Button wInputTable;
 	/**
 	 * Input variables.
 	 */
@@ -233,7 +238,19 @@ public class PRCalcDialog extends BaseStepDialog implements StepDialogInterface 
 		fdScriptFilePath.left = new FormAttachment(middle, 0);
 		fdScriptFilePath.right = new FormAttachment(100, 0);
 		wScriptFilePath.setLayoutData(fdScriptFilePath);
+		/*************************************************
+		 * Input is Table
+		 *************************************************/
+		wInputTable = new Button(gProps, SWT.CHECK);
+		wInputTable.setText(BaseMessages.getString(PKG,
+				"PRCalcDialog.InputTable"));
+		props.setLook(wInputTable);
 
+		FormData fdlInputTable = new FormData();
+		fdlInputTable.top = new FormAttachment(wScriptFilePath, margin);
+		fdlInputTable.left = new FormAttachment(middle, 0);
+		wInputTable.setLayoutData(fdlInputTable);		
+		
 		/*************************************************
 		 * Input variables table
 		 *************************************************/
@@ -244,7 +261,7 @@ public class PRCalcDialog extends BaseStepDialog implements StepDialogInterface 
 		props.setLook(wlInputVars);
 		FormData fdlInputVars = new FormData();
 		fdlInputVars.left = new FormAttachment(0, 0);
-		fdlInputVars.top = new FormAttachment(wScriptFilePath, margin);
+		fdlInputVars.top = new FormAttachment(wInputTable, margin);
 		wlInputVars.setLayoutData(fdlInputVars);
 
 		int inputVarWidgetCols = 3;
@@ -269,7 +286,7 @@ public class PRCalcDialog extends BaseStepDialog implements StepDialogInterface 
 				| SWT.FULL_SELECTION | SWT.MULTI | SWT.V_SCROLL | SWT.H_SCROLL,
 				ciInputVars, inputVarWidgetRows, lsMod, props);
 		props.setLook(wInputVars);
-		
+
 		FormData fdInputVars = new FormData();
 		fdInputVars.left = new FormAttachment(0, margin);
 		fdInputVars.top = new FormAttachment(wlInputVars, margin);
@@ -479,6 +496,8 @@ public class PRCalcDialog extends BaseStepDialog implements StepDialogInterface 
 		if (meta.getScriptFilePath() != null) {
 			wScriptFilePath.setText(meta.getScriptFilePath());
 		}
+		
+		wInputTable.setSelection(meta.isInputTable());
 
 		// Input variables
 		if (meta.getInputVars() != null) {
@@ -590,6 +609,7 @@ public class PRCalcDialog extends BaseStepDialog implements StepDialogInterface 
 	private void ok() {
 		stepname = wStepname.getText();
 		meta.setScriptFilePath(wScriptFilePath.getText());
+		meta.setInputTable(wInputTable.getSelection());
 		// Input variables.
 		int nrInputVars = wInputVars.nrNonEmpty();
 		List<PRVariable> inputVars = new ArrayList<PRVariable>();
