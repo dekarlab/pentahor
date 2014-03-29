@@ -144,14 +144,18 @@ public class PRCalc extends BaseStep implements StepInterface {
 		System.setOut(new PRPrintStream(new ByteArrayOutputStream(), log));
 		System.setErr(new PRPrintStream(new ByteArrayOutputStream(), log));
 		RowMetaInterface outputRowMeta = null;
-		if (meta.isInputTable()) {
+		if (meta.isInputTable() || getInputRowMeta() == null) {
 			// output is only result
 			outputRowMeta = new RowMeta();
 		} else {
 			// Add output variables as columns to result.
 			outputRowMeta = getInputRowMeta().clone();
 		}
-		data.setInputSize(getInputRowMeta().size());
+		if (getInputRowMeta() != null) {
+			data.setInputSize(getInputRowMeta().size());
+		} else {
+			data.setInputSize(0);
+		}
 		ValueMetaInterface valueMeta;
 		for (int i = 0; i < meta.getOutputVars().size(); i++) {
 			valueMeta = new ValueMeta();
